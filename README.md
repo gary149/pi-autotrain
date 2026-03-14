@@ -8,7 +8,7 @@ A specialized [autoresearch](https://github.com/karpathy/autoresearch) variant f
 
 ---
 
-![pi-autoresearch dashboard](pi-autoresearch.png)
+![pi-autotrain dashboard](pi-autotrain.png)
 
 ---
 
@@ -16,7 +16,7 @@ A specialized [autoresearch](https://github.com/karpathy/autoresearch) variant f
 
 | | |
 |---|---|
-| **Extension** | Tools + live widget + `/autoresearch` dashboard |
+| **Extension** | Tools + live widget + `/autotrain` dashboard |
 | **Skill** | Detects hardware, selects framework, creates data splits, writes session files, starts the fine-tuning loop |
 
 ### Extension tools
@@ -73,7 +73,7 @@ pi install https://github.com/gary149/autotrain
 <summary>Manual install</summary>
 
 ```bash
-cp -r extensions/pi-autoresearch ~/.pi/agent/extensions/
+cp -r extensions/pi-autotrain ~/.pi/agent/extensions/
 cp -r skills/autotrain-create ~/.pi/agent/skills/
 ```
 
@@ -101,7 +101,7 @@ The agent asks about your goal, base model, dataset, and constraints. It then:
 
 ### 2. The structured loop
 
-Unlike generic autoresearch, autotrain follows a **strict phase order**:
+Autotrain follows a **strict phase order**:
 
 ```
 Phase 1: Data Quality        ← HIGHEST leverage, explore first
@@ -133,7 +133,7 @@ Plus **fresh validation** every 10 experiments to catch overfitting to the test 
 ### 5. Monitor progress
 
 - **Widget** — always visible above the editor
-- **`/autoresearch`** — full dashboard with results table
+- **`/autotrain`** — full dashboard with results table
 - **`Escape`** — interrupt anytime
 
 ---
@@ -190,7 +190,7 @@ The **extension** is domain-agnostic infrastructure. The **skill** encodes fine-
 Two files keep the session alive across restarts and context resets:
 
 ```
-autoresearch.jsonl   — append-only log of every run (metric, status, commit, description)
+autotrain.jsonl      — append-only log of every run (metric, status, commit, description)
 autotrain.md         — living document: objective, hardware, phases, what's been tried
 ```
 
@@ -200,7 +200,7 @@ A fresh agent with no memory can read these two files and continue exactly where
 
 ## Backpressure checks (optional)
 
-Create `autoresearch.checks.sh` to run correctness checks after every passing benchmark.
+Create `autotrain.checks.sh` to run correctness checks after every passing benchmark.
 
 ```bash
 #!/bin/bash

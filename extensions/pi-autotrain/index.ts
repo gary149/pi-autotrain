@@ -1,5 +1,5 @@
 /**
- * autoresearch — Pi Extension
+ * autotrain — Pi Extension
  *
  * Generic autonomous experiment loop infrastructure.
  * Domain-specific behavior comes from skills (what command to run, what to optimize).
@@ -9,7 +9,7 @@
  * - `log_experiment` tool — records results with session-persisted state
  * - Status widget showing experiment count + best metric
  * - Ctrl+X toggle to expand/collapse full dashboard inline above the editor
- * - Injects autoresearch.md into context on every turn via before_agent_start
+ * - Injects autotrain.md into context on every turn via before_agent_start
  */
 
 import type {
@@ -101,7 +101,7 @@ const RunParams = Type.Object({
   checks_timeout_seconds: Type.Optional(
     Type.Number({
       description:
-        "Kill autoresearch.checks.sh after this many seconds (default: 300). Only relevant when the checks file exists.",
+        "Kill autotrain.checks.sh after this many seconds (default: 300). Only relevant when the checks file exists.",
     }),
   ),
 });
@@ -503,9 +503,9 @@ function renderDashboardLines(
 // Extension
 // ---------------------------------------------------------------------------
 
-export default function autoresearchExtension(pi: ExtensionAPI) {
+export default function autotrainExtension(pi: ExtensionAPI) {
   let dashboardExpanded = false;
-  let autoresearchMode = false;
+  let autotrainMode = false;
   let lastCtx: ExtensionContext | null = null;
 
   const MAX_AUTORESUME_TURNS = 20;
@@ -542,17 +542,17 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     currentSegment: 0,
   };
 
-  const autoresearchHelp = () =>
+  const autotrainHelp = () =>
     [
-      "Usage: /autoresearch [off|clear|<text>]",
+      "Usage: /autotrain [off|clear|<text>]",
       "",
-      "<text> enters autoresearch mode and starts or resumes the loop.",
-      "off leaves autoresearch mode.",
-      "clear deletes autoresearch.jsonl and leaves autoresearch mode.",
+      "<text> enters autotrain mode and starts or resumes the loop.",
+      "off leaves autotrain mode.",
+      "clear deletes autotrain.jsonl and leaves autotrain mode.",
       "",
       "Examples:",
-      "  /autoresearch optimize unit test runtime, monitor correctness",
-      "  /autoresearch model training, run 5 minutes of train.py and note the loss ratio as optimization target",
+      "  /autotrain optimize unit test runtime, monitor correctness",
+      "  /autotrain model training, run 5 minutes of train.py and note the loss ratio as optimization target",
     ].join("\n");
 
   // -----------------------------------------------------------------------
@@ -575,8 +575,8 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       currentSegment: 0,
     };
 
-    // Primary: read from autoresearch.jsonl (alongside autoresearch.md/sh)
-    const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
+    // Primary: read from autotrain.jsonl (alongside autotrain.md/sh)
+    const jsonlPath = path.join(ctx.cwd, "autotrain.jsonl");
     let loadedFromJsonl = false;
     try {
       if (fs.existsSync(jsonlPath)) {
@@ -664,8 +664,8 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       }
     }
 
-    // Auto-enter autoresearch mode only when a persisted experiment log exists
-    autoresearchMode = fs.existsSync(path.join(ctx.cwd, "autoresearch.jsonl"));
+    // Auto-enter autotrain mode only when a persisted experiment log exists
+    autotrainMode = fs.existsSync(path.join(ctx.cwd, "autotrain.jsonl"));
 
     updateWidget(ctx);
   };
@@ -675,18 +675,18 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     lastCtx = ctx;
 
     if (state.results.length === 0) {
-      ctx.ui.setWidget("autoresearch", undefined);
+      ctx.ui.setWidget("autotrain", undefined);
       return;
     }
 
     if (dashboardExpanded) {
       // Expanded: full dashboard table rendered as widget
-      ctx.ui.setWidget("autoresearch", (_tui, theme) => {
+      ctx.ui.setWidget("autotrain", (_tui, theme) => {
         const width = process.stdout.columns || 120;
         const lines: string[] = [];
 
         const hintText = " ctrl+x collapse • ctrl+shift+x fullscreen ";
-        const labelPrefix = "🔬 autoresearch";
+        const labelPrefix = "🔬 autotrain";
         const nameStr = state.name ? `: ${state.name}` : "";
         // 3 leading dashes + space + label + space + fill + hint
         const maxLabelLen = width - 3 - 2 - hintText.length - 1;
@@ -714,7 +714,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       });
     } else {
       // Collapsed: compact one-liner — compute everything inside render
-      ctx.ui.setWidget("autoresearch", (_tui, theme) => {
+      ctx.ui.setWidget("autotrain", (_tui, theme) => {
         const cur = currentResults(state.results, state.currentSegment);
         const kept = cur.filter((r) => r.status === "keep").length;
         const crashed = cur.filter((r) => r.status === "crash").length;
@@ -830,7 +830,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     runningExperiment = null;
     if (overlayTui) overlayTui.requestRender();
 
-    if (!autoresearchMode) return;
+    if (!autotrainMode) return;
 
     // Don't auto-resume if no experiments ran this session (user likely stopped manually)
     if (experimentsThisSession === 0) return;
@@ -842,23 +842,23 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
     if (autoResumeTurns >= MAX_AUTORESUME_TURNS) {
       ctx.ui.notify(
-        `Autoresearch auto-resume limit reached (${MAX_AUTORESUME_TURNS} turns)`,
+        `Autotrain auto-resume limit reached (${MAX_AUTORESUME_TURNS} turns)`,
         "info",
       );
       return;
     }
 
     // Auto-continue: send a message to resume the loop
-    // The agent reads autoresearch.md on startup which has all context
-    const ideasPath = path.join(ctx.cwd, "autoresearch.ideas.md");
+    // The agent reads autotrain.md on startup which has all context
+    const ideasPath = path.join(ctx.cwd, "autotrain.ideas.md");
     const hasIdeas = fs.existsSync(ideasPath);
 
     let resumeMsg =
-      "Autoresearch loop ended (likely context limit). Resume the experiment loop — read autoresearch.md and git log for context.";
+      "Autotrain loop ended (likely context limit). Resume the experiment loop — read autotrain.md and git log for context.";
     resumeMsg += ` Session so far: ${state.results.length} experiments, best ${state.metricName ?? "metric"}: ${state.bestMetric !== null ? formatNum(state.bestMetric, state.metricUnit) : "unknown"}.`;
     if (hasIdeas) {
       resumeMsg +=
-        " Check autoresearch.ideas.md for promising paths to explore. Prune stale/tried ideas.";
+        " Check autotrain.ideas.md for promising paths to explore. Prune stale/tried ideas.";
     }
     resumeMsg += ` ${BENCHMARK_GUARDRAIL}`;
 
@@ -866,24 +866,24 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     pi.sendUserMessage(resumeMsg);
   });
 
-  // When in autoresearch mode, add a static note to the system prompt.
+  // When in autotrain mode, add a static note to the system prompt.
   // Only a short pointer — no file content, fully cache-safe.
   pi.on("before_agent_start", async (event, ctx) => {
-    if (!autoresearchMode) return;
+    if (!autotrainMode) return;
 
-    const mdPath = path.join(ctx.cwd, "autoresearch.md");
-    const ideasPath = path.join(ctx.cwd, "autoresearch.ideas.md");
+    const mdPath = path.join(ctx.cwd, "autotrain.md");
+    const ideasPath = path.join(ctx.cwd, "autotrain.ideas.md");
     const hasIdeas = fs.existsSync(ideasPath);
 
-    const checksPath = path.join(ctx.cwd, "autoresearch.checks.sh");
+    const checksPath = path.join(ctx.cwd, "autotrain.checks.sh");
     const hasChecks = fs.existsSync(checksPath);
 
     let extra =
-      "\n\n## Autoresearch Mode (ACTIVE)" +
-      "\nYou are in autoresearch mode. Optimize the primary metric through an autonomous experiment loop." +
+      "\n\n## Autotrain Mode (ACTIVE)" +
+      "\nYou are in autotrain mode. Optimize the primary metric through an autonomous experiment loop." +
       "\nUse init_experiment, run_experiment, and log_experiment tools. NEVER STOP until interrupted." +
       `\nExperiment rules: ${mdPath} — read this file at the start of every session and after compaction.` +
-      "\nWrite promising but deferred optimizations as bullet points to autoresearch.ideas.md — don't let good ideas get lost." +
+      "\nWrite promising but deferred optimizations as bullet points to autotrain.ideas.md — don't let good ideas get lost." +
       `\n${BENCHMARK_GUARDRAIL}` +
       "\nIf the user sends a follow-on message while an experiment is running, finish the current run_experiment + log_experiment cycle first, then address their message in the next iteration.";
 
@@ -935,12 +935,12 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     name: "init_experiment",
     label: "Init Experiment",
     description:
-      "Initialize the experiment session. Call once before the first run_experiment to set the name, primary metric, unit, and direction. Writes the config header to autoresearch.jsonl.",
+      "Initialize the experiment session. Call once before the first run_experiment to set the name, primary metric, unit, and direction. Writes the config header to autotrain.jsonl.",
     promptSnippet:
       "Initialize experiment session (name, metric, unit, direction). Call once before first run.",
     promptGuidelines: [
-      "Call init_experiment exactly once at the start of an autoresearch session, before the first run_experiment.",
-      "If autoresearch.jsonl already exists with a config, do NOT call init_experiment again.",
+      "Call init_experiment exactly once at the start of an autotrain session, before the first run_experiment.",
+      "If autotrain.jsonl already exists with a config, do NOT call init_experiment again.",
       "If the optimization target changes (different benchmark, metric, or workload), call init_experiment again to insert a new config header and reset the baseline.",
     ],
     parameters: InitParams,
@@ -962,7 +962,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
       // Write config header to jsonl (append for re-init, create for first)
       try {
-        const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
+        const jsonlPath = path.join(ctx.cwd, "autotrain.jsonl");
         const config = JSON.stringify({
           type: "config",
           name: state.name,
@@ -980,14 +980,14 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
           content: [
             {
               type: "text",
-              text: `⚠️ Failed to write autoresearch.jsonl: ${e instanceof Error ? e.message : String(e)}`,
+              text: `⚠️ Failed to write autotrain.jsonl: ${e instanceof Error ? e.message : String(e)}`,
             },
           ],
           details: {},
         };
       }
 
-      autoresearchMode = true;
+      autotrainMode = true;
       updateWidget(ctx);
 
       const reinitNote = isReinit
@@ -997,7 +997,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         content: [
           {
             type: "text",
-            text: `✅ Experiment initialized: "${state.name}"${reinitNote}\nMetric: ${state.metricName} (${state.metricUnit || "unitless"}, ${state.bestDirection} is better)\nConfig written to autoresearch.jsonl. Now run the baseline with run_experiment.`,
+            text: `✅ Experiment initialized: "${state.name}"${reinitNote}\nMetric: ${state.metricName} (${state.metricUnit || "unitless"}, ${state.bestDirection} is better)\nConfig written to autotrain.jsonl. Now run the baseline with run_experiment.`,
           },
         ],
         details: { state: { ...state } },
@@ -1024,7 +1024,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
     name: "run_experiment",
     label: "Run Experiment",
     description:
-      "Run a shell command as an experiment. Times wall-clock duration, captures output, detects pass/fail via exit code. Use for any autoresearch experiment.",
+      "Run a shell command as an experiment. Times wall-clock duration, captures output, detects pass/fail via exit code. Use for any autotrain experiment.",
     promptSnippet:
       "Run a timed experiment command (captures duration, output, exit code)",
     promptGuidelines: [
@@ -1068,7 +1068,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       let checksOutput = "";
       let checksDuration = 0;
 
-      const checksPath = path.join(ctx.cwd, "autoresearch.checks.sh");
+      const checksPath = path.join(ctx.cwd, "autotrain.checks.sh");
       if (benchmarkPassed && fs.existsSync(checksPath)) {
         const checksTimeout = (params.checks_timeout_seconds ?? 300) * 1000;
         const ct0 = Date.now();
@@ -1124,11 +1124,11 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         text += `💥 FAILED (exit code ${result.code}) in ${durationSeconds.toFixed(1)}s\n`;
       } else if (checksTimedOut) {
         text += `✅ Benchmark PASSED in ${durationSeconds.toFixed(1)}s\n`;
-        text += `⏰ CHECKS TIMEOUT (autoresearch.checks.sh) after ${checksDuration.toFixed(1)}s\n`;
+        text += `⏰ CHECKS TIMEOUT (autotrain.checks.sh) after ${checksDuration.toFixed(1)}s\n`;
         text += `Log this as 'checks_failed' — the benchmark metric is valid but checks timed out.\n`;
       } else if (checksPass === false) {
         text += `✅ Benchmark PASSED in ${durationSeconds.toFixed(1)}s\n`;
-        text += `💥 CHECKS FAILED (autoresearch.checks.sh) in ${checksDuration.toFixed(1)}s\n`;
+        text += `💥 CHECKS FAILED (autotrain.checks.sh) in ${checksDuration.toFixed(1)}s\n`;
         text += `Log this as 'checks_failed' — the benchmark metric is valid but correctness checks did not pass.\n`;
       } else {
         text += `✅ PASSED in ${durationSeconds.toFixed(1)}s\n`;
@@ -1259,7 +1259,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       "After run_experiment, always call log_experiment to record the result.",
       "log_experiment automatically runs git add -A && git commit with the description and a Result trailer. Do NOT commit manually before calling log_experiment.",
       "Use status 'keep' if the PRIMARY metric improved. 'discard' if worse or unchanged. 'crash' if it failed. Secondary metrics are for monitoring — they almost never affect keep/discard. Only discard a primary improvement if a secondary metric degraded catastrophically, and explain why in the description.",
-      "If you discover complex but promising optimizations you won't pursue immediately, append them as bullet points to autoresearch.ideas.md. Don't let good ideas get lost.",
+      "If you discover complex but promising optimizations you won't pursue immediately, append them as bullet points to autotrain.ideas.md. Don't let good ideas get lost.",
     ],
     parameters: LogParams,
 
@@ -1272,7 +1272,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
           content: [
             {
               type: "text",
-              text: `❌ Cannot keep — autoresearch.checks.sh failed.\n\n${lastRunChecks.output.slice(-500)}\n\nLog as 'checks_failed' instead. The benchmark metric is valid but correctness checks did not pass.`,
+              text: `❌ Cannot keep — autotrain.checks.sh failed.\n\n${lastRunChecks.output.slice(-500)}\n\nLog as 'checks_failed' instead. The benchmark metric is valid but correctness checks did not pass.`,
             },
           ],
           details: {},
@@ -1446,9 +1446,9 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         text += `\n   git add autotrain.md && git commit -m "doc: update session notes"`;
       }
 
-      // Persist to autoresearch.jsonl AFTER git commit (so commit hash is correct)
+      // Persist to autotrain.jsonl AFTER git commit (so commit hash is correct)
       try {
-        const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
+        const jsonlPath = path.join(ctx.cwd, "autotrain.jsonl");
         fs.appendFileSync(
           jsonlPath,
           JSON.stringify({
@@ -1545,15 +1545,15 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerShortcut("ctrl+x", {
-    description: "Toggle autoresearch dashboard",
+    description: "Toggle autotrain dashboard",
     handler: async (ctx) => {
       if (state.results.length === 0) {
         if (
-          !autoresearchMode &&
-          !fs.existsSync(path.join(ctx.cwd, "autoresearch.md"))
+          !autotrainMode &&
+          !fs.existsSync(path.join(ctx.cwd, "autotrain.md"))
         ) {
           ctx.ui.notify(
-            "No experiments yet — run /autoresearch to get started",
+            "No experiments yet — run /autotrain to get started",
             "info",
           );
         } else {
@@ -1571,7 +1571,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerShortcut("ctrl+shift+x", {
-    description: "Fullscreen autoresearch dashboard",
+    description: "Fullscreen autotrain dashboard",
     handler: async (ctx) => {
       if (state.results.length === 0) {
         ctx.ui.notify("No experiments yet", "info");
@@ -1630,7 +1630,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
               const out: string[] = [];
 
               // Header line
-              const titlePrefix = "🔬 autoresearch";
+              const titlePrefix = "🔬 autotrain";
               const nameStr = state.name ? `: ${state.name}` : "";
               const maxTitleLen = width - 6;
               let title = titlePrefix + nameStr;
@@ -1729,31 +1729,31 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
   });
 
   // -----------------------------------------------------------------------
-  // /autoresearch command — enter autoresearch mode
+  // /autotrain command — enter autotrain mode
   // -----------------------------------------------------------------------
 
-  pi.registerCommand("autoresearch", {
-    description: "Start, stop, clear, or resume autoresearch mode",
+  pi.registerCommand("autotrain", {
+    description: "Start, stop, clear, or resume autotrain mode",
     handler: async (args, ctx) => {
       const trimmedArgs = (args ?? "").trim();
       const command = trimmedArgs.toLowerCase();
 
       if (!trimmedArgs) {
-        ctx.ui.notify(autoresearchHelp(), "info");
+        ctx.ui.notify(autotrainHelp(), "info");
         return;
       }
 
       if (command === "off") {
-        autoresearchMode = false;
+        autotrainMode = false;
         autoResumeTurns = 0;
         experimentsThisSession = 0;
-        ctx.ui.notify("Autoresearch mode OFF", "info");
+        ctx.ui.notify("Autotrain mode OFF", "info");
         return;
       }
 
       if (command === "clear") {
-        const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
-        autoresearchMode = false;
+        const jsonlPath = path.join(ctx.cwd, "autotrain.jsonl");
+        autotrainMode = false;
         autoResumeTurns = 0;
         experimentsThisSession = 0;
         state = {
@@ -1771,12 +1771,12 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         if (fs.existsSync(jsonlPath)) {
           fs.unlinkSync(jsonlPath);
           ctx.ui.notify(
-            "Deleted autoresearch.jsonl and turned autoresearch mode OFF",
+            "Deleted autotrain.jsonl and turned autotrain mode OFF",
             "info",
           );
         } else {
           ctx.ui.notify(
-            "No autoresearch.jsonl found. Autoresearch mode OFF",
+            "No autotrain.jsonl found. Autotrain mode OFF",
             "info",
           );
         }
@@ -1805,27 +1805,27 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         return;
       }
 
-      autoresearchMode = true;
+      autotrainMode = true;
       autoResumeTurns = 0;
 
-      const mdPath = path.join(ctx.cwd, "autoresearch.md");
+      const mdPath = path.join(ctx.cwd, "autotrain.md");
       const hasRules = fs.existsSync(mdPath);
 
       if (hasRules) {
         ctx.ui.notify(
-          "Autoresearch mode ON — rules loaded from autoresearch.md",
+          "Autotrain mode ON — rules loaded from autotrain.md",
           "info",
         );
         pi.sendUserMessage(
-          `Autoresearch mode active. ${trimmedArgs} ${BENCHMARK_GUARDRAIL}`,
+          `Autotrain mode active. ${trimmedArgs} ${BENCHMARK_GUARDRAIL}`,
         );
       } else {
         ctx.ui.notify(
-          "Autoresearch mode ON — no autoresearch.md found, setting up",
+          "Autotrain mode ON — no autotrain.md found, setting up",
           "info",
         );
         pi.sendUserMessage(
-          `Start autoresearch: ${trimmedArgs} ${BENCHMARK_GUARDRAIL}`,
+          `Start autotrain: ${trimmedArgs} ${BENCHMARK_GUARDRAIL}`,
         );
       }
     },

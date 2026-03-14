@@ -5,7 +5,7 @@ description: Set up and run an autonomous fine-tuning loop for LLM training. Det
 
 # Autotrain
 
-Autonomous fine-tuning loop. Specialized autoresearch for LLM training: detect hardware, pick framework, curate data, train LoRA adapters, and optimize through structured experiment phases.
+Autonomous fine-tuning loop for LLM training: detect hardware, pick framework, curate data, train LoRA adapters, and optimize through structured experiment phases.
 
 ## Tools
 
@@ -382,7 +382,7 @@ python -m compileall -q src/ || { echo "Syntax error"; exit 1; }
 
 ## `autotrain.checks.sh` (optional)
 
-Same as autoresearch: bash script for backpressure/correctness checks. **Only create when the user's constraints require correctness validation.**
+Bash script for backpressure/correctness checks. **Only create when the user's constraints require correctness validation.**
 
 When this file exists:
 - Runs automatically after every **passing** benchmark in `run_experiment`.
@@ -556,7 +556,7 @@ hf buckets create ${HF_USER}/autotrain-<goal>
 4. Sync session files to bucket (full history):
    ```bash
    hf buckets sync . hf://buckets/${HF_USER}/autotrain-<goal>/ \
-     --include "autotrain.*" --include "autoresearch.jsonl"
+     --include "autotrain.*" --include "autotrain.jsonl"
    ```
 
 ### On First `keep` (or when user asks)
@@ -584,7 +584,7 @@ hf upload ${HF_USER}/<model>-lora ./adapters/README.md README.md \
 2. Final bucket sync:
    ```bash
    hf buckets sync . hf://buckets/${HF_USER}/autotrain-<goal>/ \
-     --include "autotrain.*" --include "autoresearch.jsonl" --include "*.log"
+     --include "autotrain.*" --include "autotrain.jsonl" --include "*.log"
    ```
 3. Tag the final version:
    ```bash
