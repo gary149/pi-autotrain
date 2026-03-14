@@ -17,6 +17,10 @@ Autonomous fine-tuning loop for LLM training: detect hardware, pick framework, c
 
 Follow these steps **in order**. Do not skip steps.
 
+### Step 0: Python Environment
+
+If no virtual environment is active, create one with `uv venv && source .venv/bin/activate` before installing any packages.
+
 ### Step 1: Gather Requirements & Recon
 
 Ask (or infer from context):
