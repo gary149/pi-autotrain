@@ -1,6 +1,6 @@
 ---
 name: autotrain-create
-description: Set up and run an autonomous model training loop. Runs on HF Jobs (cloud GPUs) by default or locally. Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling. Use when asked to "train a model", "fine-tune", "run RL training", "pretrain", or "start autotrain".
+description: Set up and run an autonomous model training loop. Runs on HF Jobs (cloud GPUs) by default or locally. Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling, distillation. Use when asked to "train a model", "fine-tune", "run RL training", "pretrain", "distill", or "start autotrain".
 ---
 
 # Autotrain
@@ -26,8 +26,8 @@ Follow these steps **in order**. Do not skip steps.
 ### Step 1: Gather Requirements & Recon
 
 Ask (or infer from context):
-- **Training paradigm** — SFT / DPO / GRPO / RL / pretraining / VLM fine-tuning / reward modeling / other
-- **Goal** — what capability are we training? (e.g., "code completion", "medical QA", "play Doom", "reward model for RLHF")
+- **Training paradigm** — SFT / DPO / GRPO / RL / pretraining / VLM fine-tuning / reward modeling / distillation / other
+- **Goal** — what capability are we training? (e.g., "code completion", "medical QA", "play Doom", "reward model for RLHF", "distill GPT-4 into a 3B model")
 - **Model** — name, size, type (e.g., `Qwen/Qwen2.5-3B`, a policy network, or training from scratch)
 - **Dataset or environment** — source, format, size, any filtering criteria. RL/games may use an environment instead of a static dataset.
 - **Metric** — primary metric + direction (e.g., `exact_accuracy` higher is better, `episode_reward` higher is better)
@@ -218,7 +218,7 @@ This is the session's living memory. A fresh agent with no context should be abl
 <What capability are we training? What does success look like?>
 
 ## Training Paradigm
-<SFT / DPO / GRPO / RL / pretraining / VLM / reward modeling / other>
+<SFT / DPO / GRPO / RL / pretraining / VLM / reward modeling / distillation / other>
 
 ## Execution Mode
 - **Mode**: <HF Jobs / local>
@@ -237,6 +237,7 @@ This is the session's living memory. A fresh agent with no context should be abl
 <- VLM: which layers to unfreeze, vision encoder config>
 <- Pretraining: full model, no adapter>
 <- Reward modeling: reward head config>
+<- Distillation: student model choice, distillation method (logit-based vs data-based), temperature>
 
 ## Metrics
 - **Primary**: <name> (<unit>, lower/higher is better)
@@ -354,6 +355,8 @@ Data changes almost always have more impact than hyperparameter changes. Explore
 
 For RL/games: environment design, reward shaping, curriculum ordering.
 
+For distillation: teacher model selection, generation of synthetic training data from the teacher, temperature/top-p for teacher outputs, filtering teacher outputs by quality.
+
 **Use `hf datasets sql` to inform curation decisions:**
 ```bash
 # Distribution analysis — find the best filter thresholds
@@ -383,11 +386,13 @@ How you format the input/output matters enormously:
 - **Target length**: Shorter outputs are easier to learn (if they retain information)
 - **Special tokens**: Proper use of BOS/EOS/pad tokens
 - **Reward signal design** (RL/DPO/GRPO): reward function, preference format, KL penalty weight
+- **Teacher output format** (distillation): how to present teacher-generated data to the student — chain-of-thought, direct answers, or both
 
 ### Phase 3: Model & Architecture Config
 
 Structural model decisions — same position in the sequence, scope depends on paradigm:
 - **SFT/DPO**: LoRA rank (`r`: 8 → 16 → 32 → 64), target modules, alpha, layers
+- **Distillation**: Student model size, whether to use logit-based (KL divergence from teacher) or data-based (train on teacher-generated text) distillation, intermediate layer matching
 - **Reward modeling**: Reward head architecture, pooling strategy
 - **RL**: Policy network architecture, value head config, shared vs separate networks
 - **VLM**: Which layers to unfreeze, vision encoder config, projection layer

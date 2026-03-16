@@ -6,7 +6,7 @@
 
 A specialized [autoresearch](https://github.com/karpathy/autoresearch) variant for model training. Instead of generic optimization, autotrain encodes training domain knowledge: experiment phase ordering (data > format > architecture > hyperparameters), evaluation strategy design, overfitting detection, anti-thrash safeguards, and automatic HuggingFace Hub integration.
 
-Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling.
+Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling, distillation.
 
 ---
 
@@ -38,6 +38,7 @@ Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning
 - **Pretraining** — training from scratch on domain text
 - **VLM fine-tuning** — vision-language model adaptation
 - **Reward modeling** — training reward models for RLHF
+- **Distillation** — compressing a large teacher model into a smaller student
 
 ### Execution modes
 
