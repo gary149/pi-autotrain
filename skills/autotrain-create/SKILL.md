@@ -21,7 +21,18 @@ Follow these steps **in order**. Do not skip steps.
 
 ### Step 0: Python Environment
 
-Skip this step — dependencies are declared inline in the training script (PEP 723) or via `--with` flags. The remote HF Jobs container handles its own environment.
+The remote HF Jobs container handles its own training dependencies (PEP 723 / `--with` flags), but you need a **local** Python environment for data work (exploration, curation, splits, eval scripts).
+
+If no virtual environment is already active (`$VIRTUAL_ENV` is unset and no `.venv` directory exists), create one:
+
+```bash
+if [ -z "$VIRTUAL_ENV" ] && [ ! -d ".venv" ]; then
+  uv venv
+  source .venv/bin/activate
+fi
+```
+
+If an environment is already active or present, use it as-is.
 
 ### Step 1: Gather Requirements & Recon
 
