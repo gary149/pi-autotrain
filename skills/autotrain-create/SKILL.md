@@ -16,9 +16,9 @@ Autonomous training loop: gather requirements, prepare data or environments, tra
 - **`cancel_job`** — cancels a running job. Refuses to cancel smoke under 120s.
 - **`log_decision`** — records keep/discard/crash/smoke_failed. Like `log_experiment` but also checks `benchmark.json` integrity on keep.
 
-### Synchronous (local fallback)
-- **`run_experiment`** — runs command synchronously, times it, captures output. Use for local mode or quick tasks.
-- **`log_experiment`** — records result. `keep` auto-commits. `discard`/`crash`/`checks_failed` → `git checkout -- .` to revert. Always include secondary `metrics` dict. Dashboard: ctrl+x.
+### Utility
+- **`run_experiment`** — runs a command synchronously. Only for quick local utility tasks (data prep, evaluation scripts). **NOT for training.**
+- **`log_experiment`** — records a local utility run result. For HF Jobs training, use `log_decision` instead.
 
 ## Setup
 
@@ -26,9 +26,7 @@ Follow these steps **in order**. Do not skip steps.
 
 ### Step 0: Python Environment
 
-**Local mode only.** If no virtual environment is active, create one with `uv venv && source .venv/bin/activate` before installing any packages.
-
-**HF Jobs mode:** Skip this step — dependencies are declared inline in the training script (PEP 723) or via `--with` flags. The remote container handles its own environment.
+Skip this step — dependencies are declared inline in the training script (PEP 723) or via `--with` flags. The remote HF Jobs container handles its own environment.
 
 ### Step 1: Gather Requirements & Recon
 
@@ -38,7 +36,7 @@ Ask (or infer from context):
 - **Model** — name, size, type (e.g., `Qwen/Qwen2.5-3B`, a policy network, or training from scratch)
 - **Dataset or environment** — source, format, size, any filtering criteria. RL/games may use an environment instead of a static dataset.
 - **Metric** — primary metric + direction (e.g., `exact_accuracy` higher is better, `episode_reward` higher is better)
-- **Execution mode** — **HF Jobs** (default, recommended) or **local**. HF Jobs gives access to A100/H200 GPUs billed per-second, no local GPU required. Local is fine for Apple Silicon or if the user has a local NVIDIA GPU and prefers not to use cloud.
+- **Execution mode** — **HF Jobs** (cloud GPUs). Gives access to A100/H200 GPUs billed per-second, no local GPU required.
 - **Constraints** — max training time, budget limits, must-not-touch files
 
 **Immediately inspect the model and dataset on the Hub.** You must understand the model architecture before writing any training code — this prevents wasted time from wrong assumptions about chat templates, tokenizer behavior, target modules, or model type.
@@ -110,10 +108,6 @@ hf auth whoami
 
 Record the chosen flavor in `autotrain.md` so resuming agents reuse it. For HF Jobs specifics (script pattern, wrapper template, monitoring commands), see `references/hf-jobs.md`.
 
-#### Local (alternative)
-
-Auto-detect hardware and record it in `autotrain.md`.
-
 ### Step 3: Workspace Setup
 
 Autotrain needs a dedicated workspace. **Never run training in an existing project directory** — generated files (checkpoints, data, logs) will pollute it.
@@ -148,23 +142,9 @@ Read any existing training scripts and evaluation code **deeply** before writing
 - Check the **tokenizer chat template** — your data formatting must match it exactly (e.g., Qwen uses `<|im_start|>`/`<|im_end|>`, Llama uses `[INST]`/`[/INST]`)
 - Check **model architecture class** — determines LoRA target modules (e.g., `q_proj`, `v_proj` for most LLMs, but varies by architecture)
 - Check **config.json** — `max_position_embeddings` (context length), `hidden_size`, `num_hidden_layers` inform training parameters
-- If using a local framework, check what **data format** it expects
+Model and dataset are loaded from the Hub **inside the remote job** at runtime (via `load_dataset()` / `from_pretrained()`). No need to download locally — but you still need to explore the data locally with SQL before writing code.
 
-**HF Jobs mode:** Model and dataset are loaded from the Hub **inside the remote job** at runtime (via `load_dataset()` / `from_pretrained()`). No need to download locally — but you still need to explore the data locally with SQL before writing code.
-
-**Local mode — download model and dataset:**
-```bash
-# Download model weights (cached, re-downloads only if needed)
-hf download <model_id> --local-dir ./model
-
-# Download dataset from the Hub
-hf download <dataset_id> --repo-type dataset --local-dir ./data
-
-# Or download specific files only
-hf download <dataset_id> --repo-type dataset --include "*.parquet" --local-dir ./data
-```
-
-**Explore data with SQL before writing code (both modes):**
+**Explore data with SQL before writing code:**
 ```bash
 # Understand schema
 hf datasets sql "SELECT * FROM read_parquet('./data/train.parquet') LIMIT 1" --format json
@@ -245,8 +225,6 @@ init_experiment (with benchmark if applicable)
 → loop
 ```
 
-**Local (synchronous):** `init_experiment` → `run_experiment` baseline → `log_experiment` → start looping immediately.
-
 ---
 
 ## `autotrain.md` Template
@@ -263,7 +241,7 @@ This is the session's living memory. A fresh agent with no context should be abl
 <SFT / DPO / GRPO / RL / pretraining / VLM / reward modeling / distillation / other>
 
 ## Execution Mode
-- **Mode**: <HF Jobs / local>
+- **Mode**: HF Jobs
 - **Hardware**: <e.g., HF Jobs a10g-small / Apple M2 Max 64GB / NVIDIA RTX 4090 24GB>
 - **HF Jobs flavor**: <flavor name, if using Jobs>
 
@@ -349,32 +327,7 @@ Update `autotrain.md` after every `keep` — especially the "What's Been Tried" 
 
 ## `autotrain.sh` Template
 
-### HF Jobs mode
-
 See `references/hf-jobs.md` for the full wrapper pattern. The wrapper submits `train.py` via `hf jobs uv run -d` (detached mode) with env vars for config, then polls for completion. NEVER use attached mode — it drops the connection on long jobs.
-
-### Local mode
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# Pre-check: fast syntax/import validation (<1s)
-python -m compileall -q src/ || { echo "Syntax error"; exit 1; }
-
-# Training
-# <agent writes training command based on paradigm and framework>
-
-# Evaluation on TEST split / eval environment (fixed holdout)
-# <evaluation command here>
-
-# Output metrics — one METRIC line per metric
-# METRIC accuracy=0.847
-# METRIC val_loss=1.234
-# METRIC episode_reward=312.5
-```
-
-**Timeout guidance:** Set `timeout_seconds` in `run_experiment` to `training_time * 1.5`. If a typical run takes 5 minutes, set timeout to 450 seconds.
 
 ---
 
