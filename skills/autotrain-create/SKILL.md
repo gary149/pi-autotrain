@@ -1,11 +1,11 @@
 ---
 name: autotrain-create
-description: Set up and run an autonomous model training loop. Runs on HF Jobs (cloud GPUs) by default or locally. Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling, distillation. Use when asked to "train a model", "fine-tune", "run RL training", "pretrain", "distill", or "start autotrain".
+description: Set up and run an autonomous model training loop on HF Jobs (cloud GPUs). Supports any training paradigm: SFT, DPO, GRPO, RL, pretraining, VLM fine-tuning, reward modeling, distillation. Use when asked to "train a model", "fine-tune", "run RL training", "pretrain", "distill", or "start autotrain".
 ---
 
 # Autotrain
 
-Autonomous training loop: gather requirements, prepare data or environments, train models, and optimize through structured experiment phases — running on **HF Jobs** (cloud GPUs, default) or locally on Apple Silicon / NVIDIA.
+Autonomous training loop: gather requirements, prepare data or environments, train models, and optimize through structured experiment phases — running on **HF Jobs** (cloud GPUs).
 
 ## Tools
 
@@ -112,13 +112,33 @@ Record the chosen flavor in `autotrain.md` so resuming agents reuse it. For HF J
 
 #### Local (alternative)
 
-Auto-detect hardware and record it in `autotrain.md`. For hardware detection logic, framework-specific configs (mlx-lm, unsloth, TRL+PEFT), and **known gotchas** (e.g., mlx-lm Abort trap with combined train+test, eval-only baseline crashes, data format requirements), see `references/local.md`. Read it before writing any training code.
+Auto-detect hardware and record it in `autotrain.md`.
 
-### Step 3: Create Branch
+### Step 3: Workspace Setup
+
+Autotrain needs a dedicated workspace. **Never run training in an existing project directory** — generated files (checkpoints, data, logs) will pollute it.
 
 ```bash
+# If cwd already has non-autotrain files, create a subdirectory
+if [ "$(ls -A | grep -v '^\.git$' | head -1)" ]; then
+  mkdir -p autotrain-<goal>
+  cd autotrain-<goal>
+fi
+
+# Initialize git if not already a repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+  git init
+  git commit --allow-empty -m "autotrain: init"
+fi
+
+# Create a branch for this session
 git checkout -b autotrain/<goal>-<date>
 ```
+
+**Rules:**
+- If invoked inside an existing repo with source files, **always** create a subdirectory and work there.
+- If invoked in an empty directory or a directory that's already an autotrain workspace (has `autotrain.md`), use it directly.
+- The workspace must be a git repo before Step 4.
 
 ### Step 4: Read Source Files & Understand Model Architecture
 
@@ -128,7 +148,7 @@ Read any existing training scripts and evaluation code **deeply** before writing
 - Check the **tokenizer chat template** — your data formatting must match it exactly (e.g., Qwen uses `<|im_start|>`/`<|im_end|>`, Llama uses `[INST]`/`[/INST]`)
 - Check **model architecture class** — determines LoRA target modules (e.g., `q_proj`, `v_proj` for most LLMs, but varies by architecture)
 - Check **config.json** — `max_position_embeddings` (context length), `hidden_size`, `num_hidden_layers` inform training parameters
-- If using a local framework, check what **data format** it expects (e.g., mlx-lm needs `{"messages": [...]}` JSONL — see `references/local.md`)
+- If using a local framework, check what **data format** it expects
 
 **HF Jobs mode:** Model and dataset are loaded from the Hub **inside the remote job** at runtime (via `load_dataset()` / `from_pretrained()`). No need to download locally — but you still need to explore the data locally with SQL before writing code.
 
@@ -196,7 +216,6 @@ See templates below. Invest time making `autotrain.md` excellent — it's the se
 
 The agent writes the training code from scratch based on the paradigm. The skill does not prescribe what training code to write — only the structure around it. For execution-mode specifics, read the relevant reference file:
 - HF Jobs: `references/hf-jobs.md` (script pattern, wrapper, monitoring)
-- Local: `references/local.md` (framework configs, hardware gotchas)
 - Hub integration: `references/hf-integration.md` (uploads, model cards, CLI reference)
 
 ### Step 7: Commit Before Any Experiment
